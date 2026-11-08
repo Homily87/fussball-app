@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Tv, 
   Search, 
   Loader2 
 } from 'lucide-react';
@@ -80,7 +79,7 @@ export default function App() {
       } catch (error) {
         console.error('API-Fehler, nutze Fallback:', error);
         setMatches(getFallbackMatches());
-      } font-sans pb-16;
+      } finally {
         setLoading(false);
       }
     }
