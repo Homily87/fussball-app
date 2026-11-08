@@ -1,16 +1,16 @@
 {
-  "short_name": "FussballApp",
-  "name": "Fussballgucken.info App",
+  "name": "fussballgucken.info",
+  "short_name": "Fussball",
+  "start_url": "/fussball-app/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#059669",
   "icons": [
     {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/fussball-app/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ],
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "theme_color": "#1e293b",
-  "background_color": "#0f172a"
+  ]
 }
