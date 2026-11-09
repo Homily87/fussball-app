@@ -8,7 +8,6 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Live-Daten beim Start frisch aus der API laden
   useEffect(() => {
     async function fetchLiveMatches() {
       setLoading(true);
@@ -32,11 +31,9 @@ export default function App() {
                 const matchDate = new Date(m.matchDateTime);
                 const dateString = matchDate.toISOString().split('T')[0]; // YYYY-MM-DD
                 
-                // Formatiertes Datum für die Anzeige (z.B. "So., 08.11.")
                 const dateFormatted = matchDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                 const timeString = matchDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-                // Sender & Streams definieren
                 let tvChannels = [
                   { name: 'Sky Sport Bundesliga', hd: false, konferenz: true },
                   { name: 'Sky Sport Bundesliga 1 HD', hd: true, konferenz: true }
@@ -49,11 +46,11 @@ export default function App() {
                 if (league.shortcut === 'bl3') {
                   tvChannels = [
                     { name: 'MagentaSport', hd: false, konferenz: false },
-                    { name: 'NDR Fernsehen', hd: true, konferenz: false }
+                    { name: 'NDR Fernsehen', hd: true, konferenz: false, type: 'Free-TV' }
                   ];
                   streams = [
                     { name: 'MagentaSport App' },
-                    { name: 'NDR.de Livestream' }
+                    { name: 'NDR.de Livestream', type: 'Free-Stream' }
                   ];
                 }
 
@@ -91,32 +88,32 @@ export default function App() {
     fetchLiveMatches();
   }, []);
 
-  // Filter-Logik für "Heute", "Morgen", "7 Tage" und Free-TV
+  // Verbesserte Filter-Logik
   const filteredMatches = useMemo(() => {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-    const in7Days = new Date(today);
-    in7Days.setDate(today.getDate() + 7);
-    const in7DaysStr = in7Days.toISOString().split('T')[0];
-
     return matches.filter((match) => {
       if (onlyGerman && !match.isGerman) return false;
       
-      if (activeTab === 'heute') {
-        if (match.date !== todayStr) return false;
-      } else if (activeTab === 'morgen') {
-        if (match.date !== tomorrowStr) return false;
-      } else if (activeTab === 'naechste') {
-        // Die nächsten 7 Tage ab heute
-        if (match.date <= todayStr || match.date > in7DaysStr) return false;
-      } else if (activeTab === 'freetv') {
-        const hasFree = [...match.tvChannels, ...match.streams].some(c => c.name.includes('NDR') || c.name.includes('Free'));
+      // Wenn der Free-TV Tab aktiv ist, zeigen wir alles was Free-TV/Streams hat
+      if (activeTab === 'freetv') {
+        const hasFree = [...match.tvChannels, ...match.streams].some(c => 
+          c.name.includes('NDR') || c.name.includes('Free') || c.type?.includes('Free')
+        );
         if (!hasFree) return false;
+      } 
+      // Für die anderen Tabs filtern wir nach Datum, falls Daten vorhanden sind. 
+      // Falls der API-Spieltag auf ein anderes Datum fällt, wird es in "Nächste 7 Tage" oder generell angezeigt.
+      else if (activeTab === 'heute') {
+        // Prüfen, ob das Spiel zum heutigen Tag passt (oder wir zeigen die nächsten verfügbaren Spiele an)
+        const todayStr = new Date().toISOString().split('T')[0];
+        // Falls keine Spiele exakt auf heute fallen, zeigen wir standardmäßig den geladenen Spieltag an, damit die Tabelle nicht leer bleibt
+        const hasTodayMatches = matches.some(m => m.date === todayStr);
+        if (hasTodayMatches && match.date !== todayStr) return false;
+      } else if (activeTab === 'morgen') {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        const hasTomorrowMatches = matches.some(m => m.date === tomorrowStr);
+        if (hasTomorrowMatches && match.date !== tomorrowStr) return false;
       }
 
       if (searchQuery.trim() !== '') {
@@ -194,11 +191,11 @@ export default function App() {
         {loading ? (
           <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-            <span>Lade aktuelle Spieldaten live von Fussballgucken.info...</span>
+            <span>Lade aktuelle Spieldaten live...</span>
           </div>
         ) : filteredMatches.length === 0 ? (
           <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-8 text-center text-slate-400 text-xs">
-            Keine Spiele für diesen Zeitraum oder Filter gefunden. (Versuche "Nächste 7 Tage").
+            Keine Spiele für diesen Filter gefunden.
           </div>
         ) : (
           <div className="bg-[#1e2229] border border-slate-700 rounded-lg shadow-lg overflow-x-auto">
@@ -244,7 +241,7 @@ export default function App() {
                       </div>
                     </td>
 
-                    {/* Spalte: TV & HD-TV (Sauber untereinander) */}
+                    {/* Spalte: TV & HD-TV */}
                     <td className="py-3 px-3">
                       <div className="flex flex-col gap-1.5">
                         {match.tvChannels.map((c, i) => (
@@ -268,7 +265,7 @@ export default function App() {
                       </div>
                     </td>
 
-                    {/* Spalte: Live Streams (Sauber untereinander) */}
+                    {/* Spalte: Live Streams */}
                     <td className="py-3 px-3">
                       <div className="flex flex-col gap-1.5">
                         {match.streams.map((s, i) => (
