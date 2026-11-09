@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Loader2, Calendar } from 'lucide-react';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('heute');
@@ -8,6 +8,7 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Live-Daten beim Start frisch aus der API laden
   useEffect(() => {
     async function fetchLiveMatches() {
       setLoading(true);
@@ -29,9 +30,13 @@ export default function App() {
             if (Array.isArray(data)) {
               const formatted = data.map((m, index) => {
                 const matchDate = new Date(m.matchDateTime);
-                const dateString = matchDate.toISOString().split('T')[0];
+                const dateString = matchDate.toISOString().split('T')[0]; // YYYY-MM-DD
+                
+                // Formatiertes Datum für die Anzeige (z.B. "So., 08.11.")
+                const dateFormatted = matchDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                 const timeString = matchDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+                // Sender & Streams definieren
                 let tvChannels = [
                   { name: 'Sky Sport Bundesliga', hd: false, konferenz: true },
                   { name: 'Sky Sport Bundesliga 1 HD', hd: true, konferenz: true }
@@ -55,6 +60,7 @@ export default function App() {
                 return {
                   id: `${league.shortcut}-${m.matchID || index}`,
                   date: dateString,
+                  dateFormatted,
                   time: timeString,
                   homeTeam: m.team1.teamName,
                   awayTeam: m.team2.teamName,
@@ -85,21 +91,29 @@ export default function App() {
     fetchLiveMatches();
   }, []);
 
+  // Filter-Logik für "Heute", "Morgen", "7 Tage" und Free-TV
   const filteredMatches = useMemo(() => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const in7Days = new Date(today);
+    in7Days.setDate(today.getDate() + 7);
+    const in7DaysStr = in7Days.toISOString().split('T')[0];
 
     return matches.filter((match) => {
       if (onlyGerman && !match.isGerman) return false;
       
       if (activeTab === 'heute') {
-        if (match.date !== todayStr && matches.some(m => m.date === todayStr)) return false;
+        if (match.date !== todayStr) return false;
       } else if (activeTab === 'morgen') {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
         if (match.date !== tomorrowStr) return false;
       } else if (activeTab === 'naechste') {
-        if (match.date <= todayStr) return false;
+        // Die nächsten 7 Tage ab heute
+        if (match.date <= todayStr || match.date > in7DaysStr) return false;
       } else if (activeTab === 'freetv') {
         const hasFree = [...match.tvChannels, ...match.streams].some(c => c.name.includes('NDR') || c.name.includes('Free'));
         if (!hasFree) return false;
@@ -118,41 +132,42 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans pb-16">
       
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1e2229] border-b border-slate-700 shadow-md">
-        <div className="max-w-6xl mx-auto px-2 py-2 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <div className="max-w-7xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
           
-          <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white font-black px-2.5 py-1.5 rounded uppercase tracking-tighter text-sm italic shadow flex items-center shrink-0">
+          <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white font-black px-3 py-1.5 rounded uppercase tracking-tighter text-sm italic shadow flex items-center shrink-0">
             FUSSBALL<span className="text-cyan-300 ml-0.5">GUCKEN</span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
             <button 
               onClick={() => setActiveTab('freetv')}
-              className={`px-2.5 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'freetv' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
+              className={`px-3 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'freetv' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
             >
               Free-TV
             </button>
             <button 
               onClick={() => setActiveTab('heute')}
-              className={`px-2.5 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'heute' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
+              className={`px-3 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'heute' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
             >
               Heute
             </button>
             <button 
               onClick={() => setActiveTab('morgen')}
-              className={`px-2.5 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'morgen' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
+              className={`px-3 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'morgen' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
             >
               Morgen
             </button>
             <button 
               onClick={() => setActiveTab('naechste')}
-              className={`px-2.5 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'naechste' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
+              className={`px-3 py-1.5 rounded text-xs font-bold border transition ${activeTab === 'naechste' ? 'bg-slate-700 border-slate-600 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
             >
-              Nächste Tage
+              Nächste 7 Tage
             </button>
             <button 
               onClick={() => setOnlyGerman(!onlyGerman)}
-              className={`px-2.5 py-1.5 rounded text-xs font-bold border transition ${onlyGerman ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
+              className={`px-3 py-1.5 rounded text-xs font-bold border transition ${onlyGerman ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-[#262b35] border-slate-700 text-slate-300'}`}
             >
               🇩🇪 DE
             </button>
@@ -160,7 +175,8 @@ export default function App() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-3 mt-3">
+      {/* Suche */}
+      <div className="max-w-7xl mx-auto px-3 mt-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <input
@@ -173,78 +189,92 @@ export default function App() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-3 mt-3">
+      {/* Matrix-Tabelle */}
+      <main className="max-w-7xl mx-auto px-3 mt-3">
         {loading ? (
-          <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-10 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
+          <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
-            <span>Lade aktuelle Spieldaten live...</span>
+            <span>Lade aktuelle Spieldaten live von Fussballgucken.info...</span>
           </div>
         ) : filteredMatches.length === 0 ? (
-          <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-6 text-center text-slate-400 text-xs">
-            Keine Spiele für diese Auswahl gefunden.
+          <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-8 text-center text-slate-400 text-xs">
+            Keine Spiele für diesen Zeitraum oder Filter gefunden. (Versuche "Nächste 7 Tage").
           </div>
         ) : (
-          <div className="bg-[#1e2229] border border-slate-700 rounded-lg shadow overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+          <div className="bg-[#1e2229] border border-slate-700 rounded-lg shadow-lg overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[750px]">
               <thead>
                 <tr className="bg-[#262b35] border-b border-slate-700 text-[11px] font-extrabold uppercase text-amber-400 tracking-wider">
-                  <th className="py-2.5 px-3 w-20 text-center">Uhrzeit</th>
-                  <th className="py-2.5 px-3 w-40">Liga</th>
-                  <th className="py-2.5 px-3 w-52">Mannschaften</th>
-                  <th className="py-2.5 px-3">TV & HD-TV Angebote</th>
-                  <th className="py-2.5 px-3 w-48">Live Streams</th>
+                  <th className="py-3 px-3 w-28">Datum & Uhrzeit</th>
+                  <th className="py-3 px-3 w-40">Liga</th>
+                  <th className="py-3 px-3 w-56">Mannschaften</th>
+                  <th className="py-3 px-3">TV & HD-TV Übertragungen</th>
+                  <th className="py-3 px-3 w-52">Live Streams</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-xs">
                 {filteredMatches.map((match) => (
-                  <tr key={match.id} className="hover:bg-slate-800/50 transition align-top">
+                  <tr key={match.id} className="hover:bg-slate-800/40 transition align-top">
                     
-                    <td className="py-3 px-3 text-center font-bold text-amber-400 whitespace-nowrap bg-[#1a1d24]">
-                      {match.time}
+                    {/* Spalte: Datum & Uhrzeit */}
+                    <td className="py-3 px-3 whitespace-nowrap bg-[#171a20]">
+                      <div className="font-bold text-amber-400 flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-slate-400" />
+                        {match.dateFormatted}
+                      </div>
+                      <div className="text-slate-300 font-semibold mt-0.5 ml-4">
+                        {match.time} Uhr
+                      </div>
                     </td>
 
-                    <td className="py-3 px-3 font-semibold text-slate-300">
+                    {/* Spalte: Liga */}
+                    <td className="py-3 px-3 font-medium text-slate-300">
                       <div className="flex items-center gap-1.5">
                         <span className="text-sm">{match.flag}</span>
                         <span className="truncate">{match.competition}</span>
                       </div>
                     </td>
 
+                    {/* Spalte: Mannschaften */}
                     <td className="py-3 px-3 font-bold text-white">
-                      <div className="flex flex-col gap-0.5">
-                        <span>{match.homeTeam}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="truncate">{match.homeTeam}</span>
                         <span className="text-slate-400 text-[10px] font-normal">vs</span>
-                        <span>{match.awayTeam}</span>
+                        <span className="truncate">{match.awayTeam}</span>
                       </div>
                     </td>
 
+                    {/* Spalte: TV & HD-TV (Sauber untereinander) */}
                     <td className="py-3 px-3">
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-col gap-1.5">
                         {match.tvChannels.map((c, i) => (
-                          <span 
+                          <div 
                             key={i} 
-                            className={`font-black text-[11px] px-2 py-1 rounded shadow-sm inline-flex items-center gap-1.5 ${
+                            className={`font-black text-[11px] px-2.5 py-1 rounded shadow-sm inline-flex items-center justify-between gap-2 w-full max-w-xs ${
                               c.hd ? 'bg-slate-200 text-slate-900 border border-slate-400' : 'bg-[#facc15] text-slate-950'
                             }`}
                           >
-                            {c.hd && <span className="text-[9px] bg-slate-800 text-white px-1 rounded">HD</span>}
-                            <span>{c.name}</span>
+                            <div className="flex items-center gap-1.5 truncate">
+                              {c.hd && <span className="text-[9px] bg-slate-800 text-white px-1 py-0.5 rounded shrink-0">HD</span>}
+                              <span className="truncate">{c.name}</span>
+                            </div>
                             {c.konferenz && (
-                              <span className="bg-slate-950 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[10px] font-bold" title="Konferenz verfügbar">
+                              <span className="bg-slate-950 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0" title="Konferenz verfügbar">
                                 K
                               </span>
                             )}
-                          </span>
+                          </div>
                         ))}
                       </div>
                     </td>
 
+                    {/* Spalte: Live Streams (Sauber untereinander) */}
                     <td className="py-3 px-3">
-                      <div className="flex flex-col gap-1">
+                      <div className="flex flex-col gap-1.5">
                         {match.streams.map((s, i) => (
-                          <span key={i} className="bg-sky-500 text-slate-950 font-black text-[11px] px-2 py-1 rounded shadow-sm inline-block w-fit">
+                          <div key={i} className="bg-sky-500 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded shadow-sm w-full max-w-[200px] truncate">
                             {s.name}
-                          </span>
+                          </div>
                         ))}
                       </div>
                     </td>
