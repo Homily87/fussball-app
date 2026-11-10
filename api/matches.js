@@ -35,12 +35,6 @@ export default async function handler(req, res) {
 
     $('tr').each((index, element) => {
       const rowText = $(element).text();
-      const lower = rowText.toLowerCase();
-
-      // Sofortiger, kompromissloser Ausschluss bei Treffern nach Frauen oder Women
-      if (lower.includes('frauen') || lower.includes('women')) {
-        return;
-      }
 
       // Uhrzeit & Datum extrahieren
       const timeMatch = rowText.match(/(\d{2}:\d{2})/);
