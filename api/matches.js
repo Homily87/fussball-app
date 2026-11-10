@@ -9,12 +9,12 @@ export default async function handler(req, res) {
 
   const tab = req.query.tab || 'heute';
   
-  // Dynamische URL-Auswahl basierend auf dem gewählten Tab
+  // Exakte URLs der Quellseite festlegen
   let targetUrl = 'https://fussballgucken.info/fussball-heute';
   if (tab === 'morgen') {
     targetUrl = 'https://fussballgucken.info/fussball-morgen';
   } else if (tab === 'naechste') {
-    targetUrl = 'https://fussballgucken.info/vorschau'; // Falls abweichend, ggf. anpassen
+    targetUrl = 'https://fussballgucken.info/fussball-alle-termine';
   }
 
   try {
@@ -24,16 +24,20 @@ export default async function handler(req, res) {
       }
     });
 
+    if (!response.ok) {
+      return res.status(200).json({ success: true, tab, count: 0, matches: [] });
+    }
+
     const html = await response.text();
     const allMatches = [];
 
-    // Echter HTML-Parsing-Block für die Live-Daten
+    // Aufspalten der HTML-Struktur in Zeilen/Blöcke
     const rows = html.split('<tr');
 
     for (const row of rows) {
       const lower = row.toLowerCase();
 
-      // Frauenfußball und Juniorinnen absolut strikt filtern
+      // Striker Filter gegen Frauenfußball & Juniorinnen
       if (
         lower.includes('frauen') || 
         lower.includes('women') || 
@@ -45,7 +49,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // Hier greift die echte Extraktion aus den Tabellenzeilen der Zielseite
+      // Datenpunkte parsen
       const timeMatch = row.match(/(\d{2}:\d{2})/);
       const dateMatch = row.match(/([Mo|Di|Mi|Do|Fr|Sa|So],\s*\d{2}\.\d{2}\.?)/i);
       const homeMatch = row.match(/class="[^"]*home[^"]*"[^>]*>([^<]+)</i);
@@ -53,18 +57,42 @@ export default async function handler(req, res) {
       const compMatch = row.match(/class="[^"]*league[^"]*"[^>]*>([^<]+)</i);
 
       if (timeMatch && homeMatch && awayMatch) {
+        const home = homeMatch[1].trim();
+        const away = awayMatch[1].trim();
+        const time = timeMatch[1];
+        const comp = compMatch ? compMatch[1].trim() : 'Fußball Live';
+
+        // Sender & Streams aus den Tabellenzellen auslesen
+        const tvList = [];
+        const hdList = [];
+        const streamList = [];
+
+        // Suche nach TV-Sendern, HD-Sendern und Streams im HTML-Zeilenblock
+        if (lower.includes('rtl') && !lower.includes('rtl+')) {
+          if (lower.includes('rtl hd')) hdList.push({ name: 'RTL HD', free: true });
+          else tvList.push({ name: 'RTL', free: true });
+        }
+        if (lower.includes('rtl+')) streamList.push({ name: 'RTL+' });
+        if (lower.includes('dazn')) {
+          if (lower.includes('dazn 1') || lower.includes('dazn 2')) hdList.push({ name: 'DAZN HD', free: false });
+          else streamList.push({ name: 'DAZN' });
+        }
+        if (lower.includes('sky')) hdList.push({ name: 'Sky Sport HD', free: false });
+        if (lower.includes('zdf')) hdList.push({ name: 'ZDF HD', free: true });
+        if (lower.includes('ard') || lower.includes('daserste')) hdList.push({ name: 'Das Erste HD', free: true });
+
         allMatches.push({
           id: Math.random().toString(36).substring(2, 9),
-          date: dateMatch ? dateMatch[1] : (tab === 'heute' ? 'Heute' : 'Morgen'),
-          time: timeMatch[1],
-          homeTeam: homeMatch[1].trim(),
-          awayTeam: awayMatch[1].trim(),
-          competition: compMatch ? compMatch[1].trim() : 'Fußball Live',
-          flag: '⚽',
+          date: dateMatch ? dateMatch[1] : (tab === 'heute' ? 'Heute' : (tab === 'morgen' ? 'Morgen' : 'Vorschau')),
+          time: time,
+          homeTeam: home,
+          awayTeam: away,
+          competition: comp,
+          flag: comp.toLowerCase().includes('nations') || comp.toLowerCase().includes('champions') ? '🇪🇺' : '🇩🇪',
           isGerman: true,
-          tvChannels: [],
-          hdChannels: [],
-          streams: []
+          tvChannels: tvList,
+          hdChannels: hdList,
+          streams: streamList
         });
       }
     }
