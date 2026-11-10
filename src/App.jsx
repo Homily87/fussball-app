@@ -8,11 +8,12 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Live-Daten abhängig vom ausgewählten Tab aus der Vercel-API laden
   useEffect(() => {
     async function fetchScrapedMatches() {
       setLoading(true);
       try {
-        const VERCEL_URL = 'https://fussball-app-ebon.vercel.app/api/matches';
+        const VERCEL_URL = `https://fussball-app-ebon.vercel.app/api/matches?tab=${activeTab}`;
         const response = await fetch(VERCEL_URL);
         const data = await response.json();
 
@@ -30,12 +31,13 @@ export default function App() {
     }
 
     fetchScrapedMatches();
-  }, []);
+  }, [activeTab]);
 
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
+      // Strikter Ausschluss von Frauenfußball
       const text = (match.homeTeam + ' ' + match.awayTeam + ' ' + match.competition).toLowerCase();
-      if (text.includes('frauen') || text.includes('women')) return false;
+      if (text.includes('frauen') || text.includes('women') || text.includes('wom')) return false;
 
       if (onlyGerman && !match.isGerman) return false;
 
@@ -52,8 +54,9 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans pb-16">
       
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1e2229] border-b border-slate-700 shadow-md">
-        <div className="max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+        <div className="max-w-6xl mx-auto px-3 py-3 flex items-center justify-between gap-2 overflow-x-auto">
           
           <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white font-black px-3 py-1.5 rounded uppercase tracking-tighter text-sm italic shadow flex items-center shrink-0">
             FUSSBALL<span className="text-cyan-300 ml-0.5">GUCKEN</span>
@@ -88,6 +91,7 @@ export default function App() {
         </div>
       </header>
 
+      {/* Suche */}
       <div className="max-w-6xl mx-auto px-3 mt-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -101,6 +105,7 @@ export default function App() {
         </div>
       </div>
 
+      {/* Matrix-Tabelle */}
       <main className="max-w-6xl mx-auto px-3 mt-3">
         {loading ? (
           <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
@@ -127,10 +132,12 @@ export default function App() {
                 {filteredMatches.map((match) => (
                   <tr key={match.id} className="hover:bg-slate-800/40 transition align-top">
                     
+                    {/* Uhrzeit */}
                     <td className="py-3.5 px-3.5 whitespace-nowrap bg-[#171a20] font-bold text-amber-400">
                       {match.time} Uhr
                     </td>
 
+                    {/* Liga */}
                     <td className="py-3.5 px-3.5 font-medium text-slate-300">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{match.flag}</span>
@@ -138,6 +145,7 @@ export default function App() {
                       </div>
                     </td>
 
+                    {/* Mannschaften */}
                     <td className="py-3.5 px-3.5 font-bold text-white">
                       <div className="flex flex-col space-y-1 my-1">
                         <div className="text-slate-100">{match.homeTeam}</div>
@@ -146,17 +154,18 @@ export default function App() {
                       </div>
                     </td>
 
+                    {/* TV & HD-TV */}
                     <td className="py-3.5 px-3.5">
                       <div className="flex flex-col space-y-2 my-1">
                         {match.tvChannels.map((c, i) => (
                           <div 
                             key={i} 
-                            className={`font-black text-[11px] px-3 py-1.5 rounded shadow-sm inline-flex items-center justify-between gap-2 w-full max-w-xs ${
+                            className={`font-black text-[11px] px-3 py-1.5 rounded shadow-sm inline-flex items-center justify-between gap-3 w-full max-w-xs ${
                               c.hd ? 'bg-slate-200 text-slate-900 border border-slate-300' : 'bg-[#facc15] text-slate-950'
                             }`}
                           >
-                            <div className="flex items-center gap-2 truncate">
-                              {c.hd && <span className="text-[9px] bg-slate-900 text-white px-1 py-0.5 rounded shrink-0 font-bold">HD</span>}
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              {c.hd && <span className="text-[9px] bg-slate-900 text-white px-1.5 py-0.5 rounded shrink-0 font-bold">HD</span>}
                               <span className="truncate">{c.name}</span>
                             </div>
                             {c.konferenz && (
@@ -169,6 +178,7 @@ export default function App() {
                       </div>
                     </td>
 
+                    {/* Live Streams */}
                     <td className="py-3.5 px-3.5">
                       <div className="flex flex-col space-y-2 my-1">
                         {match.streams.map((s, i) => (
