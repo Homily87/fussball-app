@@ -33,21 +33,27 @@ export default async function handler(req, res) {
     const $ = cheerio.load(html);
     const matches = [];
 
-    // Wir durchlaufen alle Tabellenzeilen auf der Seite
+    // Relevanten deutschen Teams / Ligen im Frauenbereich für die Freigabe
+    const germanKeywords = [
+      'deutschland', 'bayern', 'wolfsburg', 'frankfurt', 'hoffenheim', 
+      'leverkusen', 'freiburg', 'essen', 'werder', 'leipzig', 'köln', 
+      'jena', 'potsdam', 'bundesliga'
+    ];
+
     $('tr').each((index, element) => {
       const rowText = $(element).text();
       const lower = rowText.toLowerCase();
 
-      // Striker Ausschluss von Frauenfußball & Juniorinnen
-      if (
-        lower.includes('frauen') || 
-        lower.includes('women') || 
-        lower.includes('wom') || 
-        lower.includes('juniorinnen') || 
-        lower.includes('u17 frauen') ||
-        lower.includes('u19 frauen')
-      ) {
-        return;
+      const isWomenMatch = lower.includes('frauen') || lower.includes('women') || lower.includes('wom');
+
+      if (isWomenMatch) {
+        // Prüfen, ob eine deutsche Beteiligung vorhanden ist
+        const hasGermanInvolvement = germanKeywords.some(keyword => lower.includes(keyword));
+        
+        // Wenn Frauen-Spiel ohne deutsche Beteiligung oder Juniorinnen -> Überspringen
+        if (!hasGermanInvolvement || lower.includes('juniorinnen') || lower.includes('u17') || lower.includes('u19')) {
+          return;
+        }
       }
 
       // Uhrzeit & Datum extrahieren
@@ -80,7 +86,6 @@ export default async function handler(req, res) {
           }
         });
 
-        // Fallback für Datum basierend auf ausgewähltem Tab
         let displayDate = dateMatch ? dateMatch[1] : (tab === 'heute' ? 'Heute' : (tab === 'morgen' ? 'Morgen' : 'Vorschau'));
 
         matches.push({
