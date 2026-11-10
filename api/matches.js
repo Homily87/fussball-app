@@ -1,8 +1,15 @@
 import * as cheerio from 'cheerio';
 
 export default async function handler(req, res) {
+  // 1. Cache komplett deaktivieren (verhindert 304 Not Modified)
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
+  // 2. CORS-Freigabe für GitHub Pages
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
@@ -21,7 +28,7 @@ export default async function handler(req, res) {
   try {
     const response = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
       }
     });
 
@@ -33,65 +40,60 @@ export default async function handler(req, res) {
     const $ = cheerio.load(html);
     const matches = [];
 
-    // Durchsuche alle Zeilen in Tabellen
     $('tr').each((index, element) => {
       const $row = $(element);
-      const rowText = $row.text().trim();
+      const text = $row.text().trim();
 
-      // Uhrzeit finden (z.B. 20:45)
-      const timeMatch = rowText.match(/(\d{2}:\d{2})/);
+      // Uhrzeit prüfen
+      const timeMatch = text.match(/(\d{2}:\d{2})/);
       if (!timeMatch) return;
 
-      // Datum finden (z.B. Fr, 13.11.)
-      const dateMatch = rowText.match(/([Mo|Di|Mi|Do|Fr|Sa|So],\s*\d{2}\.\d{2}\.?)/i);
+      // Datum prüfen
+      const dateMatch = text.match(/([Mo|Di|Mi|Do|Fr|Sa|So],\s*\d{2}\.\d{2}\.?)/i);
 
-      // Mannschaften auslesen (entweder über Links oder Text-Trennung)
+      // Teams ermitteln
+      const teamLinks = $row.find('a[href*="/mannschaft/"], a[href*="/verein/"], a[href*="/team/"]');
       let home = '';
       let away = '';
 
-      const links = $row.find('a');
-      const teams = [];
-      
-      links.each((i, el) => {
-        const text = $(el).text().trim();
-        const href = $(el).attr('href') || '';
-        if (text && (href.includes('/team') || href.includes('/verein') || href.includes('/mannschaft') || href.includes('/match'))) {
-          teams.push(text);
-        }
-      });
-
-      if (teams.length >= 2) {
-        home = teams[0];
-        away = teams[1];
+      if (teamLinks.length >= 2) {
+        home = $(teamLinks[0]).text().trim();
+        away = $(teamLinks[1]).text().trim();
       } else {
-        // Fallback: Versuche Teams aus dem Textblöcken zu extrahieren
-        const vsSplit = rowText.split(/\s+vs\.?\s+|\s+-\s+/i);
-        if (vsSplit.length >= 2) {
-          home = vsSplit[0].split('\n').pop().trim();
-          away = vsSplit[1].split('\n')[0].trim();
+        // Alternative Textextraktion
+        const textParts = text.replace(/\s+/g, ' ').split(timeMatch[1]);
+        if (textParts[1]) {
+          const matchString = textParts[1].split('TV')[0].split(' Stream')[0];
+          const vsSplit = matchString.split(/\s*-\s*|\s*vs\.?\s*/i);
+          if (vsSplit.length >= 2) {
+            home = vsSplit[0].trim();
+            away = vsSplit[1].trim();
+          }
         }
       }
 
       if (!home || !away) return;
 
-      // Wettbewerb finden
-      const compLink = $row.find('a[href*="/wettbewerb/"], a[href*="/liga/"]').first().text().trim();
+      // Wettbewerb
+      const comp = $row.find('a[href*="/wettbewerb/"]').first().text().trim() || 'Fußball Live';
 
-      // Sender & Stream Kanäle auslesen
+      // Sender & Streams
       const tvChannels = [];
       const hdChannels = [];
       const streams = [];
 
-      $row.find('td, span, a').each((i, el) => {
-        const txt = $(el).text().trim();
-        const txtLower = txt.toLowerCase();
+      $row.find('a, span').each((_, el) => {
+        const val = $(el).text().trim();
+        const lower = val.toLowerCase();
 
-        if (txtLower.includes('rtl+') || txtLower.includes('stream') || txtLower.includes('dazn app')) {
-          if (txt.length < 30 && !streams.some(s => s.name === txt)) streams.push({ name: txt });
-        } else if (txtLower.includes('hd')) {
-          if (txt.length < 30 && !hdChannels.some(h => h.name === txt)) hdChannels.push({ name: txt, free: txtLower.includes('free') });
-        } else if (txtLower.includes('rtl') || txtLower.includes('sky') || txtLower.includes('zdf') || txtLower.includes('ard') || txtLower.includes('sat.1')) {
-          if (txt.length < 30 && !tvChannels.some(t => t.name === txt)) tvChannels.push({ name: txt, free: txtLower.includes('free') });
+        if (!val || val.length > 30) return;
+
+        if (lower.includes('rtl+') || lower.includes('stream') || lower.includes('dazn app') || lower.includes('joyn')) {
+          if (!streams.some(s => s.name === val)) streams.push({ name: val });
+        } else if (lower.includes('hd')) {
+          if (!hdChannels.some(h => h.name === val)) hdChannels.push({ name: val, free: lower.includes('free') });
+        } else if (lower.includes('rtl') || lower.includes('sky') || lower.includes('zdf') || lower.includes('ard') || lower.includes('sat.1')) {
+          if (!tvChannels.some(t => t.name === val)) tvChannels.push({ name: val, free: lower.includes('free') });
         }
       });
 
@@ -103,7 +105,7 @@ export default async function handler(req, res) {
         time: timeMatch[1],
         homeTeam: home,
         awayTeam: away,
-        competition: compLink || 'Fußball Live',
+        competition: comp,
         flag: '⚽',
         isGerman: true,
         tvChannels,
