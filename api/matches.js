@@ -1,4 +1,4 @@
-module.exports = function handler(req, res) {
+export default function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -9,7 +9,7 @@ module.exports = function handler(req, res) {
 
   const matches = [
     {
-      id: Math.random().toString(36).substring(2, 9),
+      id: 'm1',
       time: '21:00',
       homeTeam: 'FC Bayern München',
       awayTeam: 'Paris Saint-Germain',
@@ -20,7 +20,7 @@ module.exports = function handler(req, res) {
       streams: [{ name: 'DAZN App' }]
     },
     {
-      id: Math.random().toString(36).substring(2, 9),
+      id: 'm2',
       time: '20:45',
       homeTeam: 'Serbien',
       awayTeam: 'Deutschland',
@@ -37,4 +37,4 @@ module.exports = function handler(req, res) {
     count: matches.length,
     matches: matches
   });
-};
+}
