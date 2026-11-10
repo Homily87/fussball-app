@@ -8,16 +8,21 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Spieldaten vollautomatisch und tagesaktuell live von der API abrufen
   useEffect(() => {
     async function fetchLiveMatches() {
       setLoading(true);
       try {
         const currentYear = new Date().getFullYear();
+        
+        // Erweiterte Wettbewerbe inklusive Länderspiele (DFB) & Champions League
         const leagues = [
           { shortcut: 'bl1', name: '1. Bundesliga', flag: '🇩🇪', isGerman: true },
           { shortcut: 'bl2', name: '2. Bundesliga', flag: '🇩🇪', isGerman: true },
-          { shortcut: 'bl3', name: '3. Liga', flag: '🇩🇪', isGerman: true }
+          { shortcut: 'bl3', name: '3. Liga', flag: '🇩🇪', isGerman: true },
+          { shortcut: 'dfb', name: 'DFB-Pokal', flag: '🇩🇪', isGerman: true },
+          { shortcut: 'cl', name: 'UEFA Champions League', flag: '🇪🇺', isGerman: false },
+          { shortcut: 'el', name: 'UEFA Europa League', flag: '🇪🇺', isGerman: false },
+          { shortcut: 'nl', name: 'UEFA Nations League / Länderspiele', flag: '🇪🇺', isGerman: true }
         ];
 
         let allFetchedMatches = [];
@@ -30,29 +35,41 @@ export default function App() {
             if (Array.isArray(data)) {
               const formatted = data.map((m, index) => {
                 const matchDate = new Date(m.matchDateTime);
-                const dateString = matchDate.toISOString().split('T')[0]; // YYYY-MM-DD
+                const dateString = matchDate.toISOString().split('T')[0];
                 const dateFormatted = matchDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                 const timeString = matchDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
-                // Sender & Streams dynamisch je nach Liga zuordnen
-                let tvChannels = [
-                  { name: 'Sky Sport Bundesliga', hd: false, konferenz: true },
-                  { name: 'Sky Sport Bundesliga 1 HD', hd: true, konferenz: true }
-                ];
-                let streams = [
-                  { name: 'Sky Go' },
-                  { name: 'WOW' }
-                ];
+                // Zuordnung der Übertragungspartner je nach Wettbewerb
+                let tvChannels = [];
+                let streams = [];
 
-                if (league.shortcut === 'bl3') {
+                if (league.shortcut === 'bl1' || league.shortcut === 'bl2') {
+                  tvChannels = [
+                    { name: 'Sky Sport Bundesliga', hd: false, konferenz: true },
+                    { name: 'Sky Sport Bundesliga 1 HD', hd: true, konferenz: true }
+                  ];
+                  streams = [{ name: 'Sky Go' }, { name: 'WOW' }];
+                } else if (league.shortcut === 'bl3') {
                   tvChannels = [
                     { name: 'MagentaSport', hd: false, konferenz: false },
-                    { name: 'NDR Fernsehen / WDR', hd: true, konferenz: false }
+                    { name: 'NDR / WDR Fernsehen', hd: true, konferenz: false }
                   ];
-                  streams = [
-                    { name: 'MagentaSport App' },
-                    { name: 'Streaming Live' }
+                  streams = [{ name: 'MagentaSport App' }, { name: 'Sportschau Stream' }];
+                } else if (league.shortcut === 'cl') {
+                  tvChannels = [
+                    { name: 'DAZN 1', hd: true, konferenz: false },
+                    { name: 'DAZN 2', hd: true, konferenz: true }
                   ];
+                  streams = [{ name: 'DAZN App' }, { name: 'Amazon Prime Video' }];
+                } else if (league.shortcut === 'nl' || league.shortcut === 'dfb') {
+                  tvChannels = [
+                    { name: 'RTL Fernsehen', hd: true, konferenz: false },
+                    { name: 'Das Erste / ZDF HD', hd: true, konferenz: false }
+                  ];
+                  streams = [{ name: 'RTL+' }, { name: 'ZDFmediathek' }];
+                } else {
+                  tvChannels = [{ name: 'DAZN / Sky Sport', hd: true, konferenz: false }];
+                  streams = [{ name: 'Live Stream' }];
                 }
 
                 return {
@@ -65,7 +82,7 @@ export default function App() {
                   awayTeam: m.team2.teamName,
                   competition: league.name,
                   flag: league.flag,
-                  isGerman: league.isGerman,
+                  isGerman: league.isGerman || m.team1.teamName.includes('Deutschland') || m.team2.teamName.includes('Deutschland'),
                   tvChannels,
                   streams
                 };
@@ -74,11 +91,11 @@ export default function App() {
               allFetchedMatches = [...allFetchedMatches, ...formatted];
             }
           } catch (err) {
-            console.error(`Fehler bei ${league.name}:`, err);
+            console.error(`Fehler bei Abfrage von ${league.name}:`, err);
           }
         }
 
-        // Chronologisch nach Datum sortieren
+        // Aufsteigend nach Anpfiff-Zeitpunkt sortieren
         allFetchedMatches.sort((a, b) => a.dateTimeObj - b.dateTimeObj);
         setMatches(allFetchedMatches);
       } catch (error) {
@@ -92,7 +109,7 @@ export default function App() {
     fetchLiveMatches();
   }, []);
 
-  // Automatisierte und strenge Filterung (Vergangene Spiele & Frauen-Spiele werden ausgeschlossen)
+  // Exakte Filterung (keine alten Spiele, keine Frauen-Spiele)
   const filteredMatches = useMemo(() => {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
@@ -106,20 +123,18 @@ export default function App() {
     const in7DaysStr = in7Days.toISOString().split('T')[0];
 
     return matches.filter((match) => {
-      // 1. Frauen-Spiele strikt erkennen und ausschließen
-      const textToCheck = (match.homeTeam + ' ' + match.awayTeam + ' ' + match.competition).toLowerCase();
-      if (textToCheck.includes('frauen') || textToCheck.includes('women') || textToCheck.includes('wom')) {
+      // 1. Frauen-Spiele strikt ausschließen
+      const text = (match.homeTeam + ' ' + match.awayTeam + ' ' + match.competition).toLowerCase();
+      if (text.includes('frauen') || text.includes('women') || text.includes('wom')) {
         return false;
       }
 
-      // 2. Vergangene Spiele (vor heute) niemals anzeigen
-      if (match.date < todayStr) {
-        return false;
-      }
+      // 2. Vergangene Spiele herausfiltern
+      if (match.date < todayStr) return false;
 
       if (onlyGerman && !match.isGerman) return false;
 
-      // 3. Exakte Tabellenfilterung ohne Ausweichen
+      // 3. Reiter-Filterung (Heute, Morgen, Nächste 7 Tage)
       if (activeTab === 'heute') {
         if (match.date !== todayStr) return false;
       } else if (activeTab === 'morgen') {
@@ -210,7 +225,7 @@ export default function App() {
               <thead>
                 <tr className="bg-[#262b35] border-b border-slate-700 text-[11px] font-extrabold uppercase text-amber-400 tracking-wider">
                   <th className="py-3 px-3.5 w-28">Datum & Zeit</th>
-                  <th className="py-3 px-3.5 w-44">Liga</th>
+                  <th className="py-3 px-3.5 w-44">Liga / Pokal</th>
                   <th className="py-3 px-3.5 w-60">Mannschaften</th>
                   <th className="py-3 px-3.5">TV & HD-TV</th>
                   <th className="py-3 px-3.5 w-48">Live Streams</th>
