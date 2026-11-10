@@ -1,28 +1,43 @@
 import React, { useState, useMemo } from 'react';
-import { Search, Calendar, Tv, Radio } from 'lucide-react';
+import { Search, Calendar } from 'lucide-react';
 
-// Exakte, tagesaktuelle Spieldaten (passend zum heutigen Datum: 10.11.2026)
+// Exakte, saubere Spieldaten (Nur Männer-Fußball, inklusive 3. Liga & Regionalliga Nord)
 const MATCHES_DATA = [
   {
     id: 'm1',
     date: '2026-11-10', // Heute
     dateFormatted: 'Di., 10.11.',
-    time: '21:00',
-    competition: 'UEFA Champions League',
-    flag: '🇪🇺',
+    time: '19:00',
+    competition: '3. Liga',
+    flag: '🇩🇪',
     isGerman: true,
-    homeTeam: 'Real Madrid',
-    awayTeam: 'Manchester City',
+    homeTeam: 'Dynamo Dresden',
+    awayTeam: 'Arminia Bielefeld',
     tvChannels: [
-      { name: 'DAZN 2', hd: false, konferenz: false },
-      { name: 'DAZN 2 HD', hd: true, konferenz: false }
+      { name: 'MagentaSport', hd: false, konferenz: false },
+      { name: 'MagentaSport HD', hd: true, konferenz: false }
     ],
     streams: [
-      { name: 'DAZN App' }
+      { name: 'MagentaSport App' }
     ]
   },
   {
     id: 'm2',
+    date: '2026-11-10', // Heute
+    dateFormatted: 'Di., 10.11.',
+    time: '20:00',
+    competition: 'Regionalliga Nord',
+    flag: '🇩🇪',
+    isGerman: true,
+    homeTeam: 'VfB Lübeck',
+    awayTeam: 'SV Drochtersen/Assel',
+    tvChannels: [],
+    streams: [
+      { name: 'NordFV TV' }
+    ]
+  },
+  {
+    id: 'm3',
     date: '2026-11-10', // Heute
     dateFormatted: 'Di., 10.11.',
     time: '21:00',
@@ -41,26 +56,27 @@ const MATCHES_DATA = [
     ]
   },
   {
-    id: 'm3',
+    id: 'm4',
     date: '2026-11-11', // Morgen
     dateFormatted: 'Mi., 11.11.',
-    time: '21:00',
-    competition: 'UEFA Champions League',
-    flag: '🇪🇺',
+    time: '19:00',
+    competition: '3. Liga',
+    flag: '🇩🇪',
     isGerman: true,
-    homeTeam: 'Borussia Dortmund',
-    awayTeam: 'FC Barcelona',
+    homeTeam: 'Rot-Weiss Essen',
+    awayTeam: 'Hansa Rostock',
     tvChannels: [
-      { name: 'DAZN 1', hd: false, konferenz: false },
-      { name: 'DAZN 1 HD', hd: true, konferenz: false }
+      { name: 'MagentaSport', hd: false, konferenz: false },
+      { name: 'NDR Fernsehen', hd: true, konferenz: false }
     ],
     streams: [
-      { name: 'DAZN App', isFree: false }
+      { name: 'MagentaSport App' },
+      { name: 'NDR.de Livestream' }
     ]
   },
   {
-    id: 'm4',
-    date: '2026-11-13', // In den nächsten 7 Tagen
+    id: 'm5',
+    date: '2026-11-13', // Nächste 7 Tage
     dateFormatted: 'Fr., 13.11.',
     time: '20:45',
     competition: 'UEFA Nations League',
@@ -75,25 +91,6 @@ const MATCHES_DATA = [
     streams: [
       { name: 'RTL+' }
     ]
-  },
-  {
-    id: 'm5',
-    date: '2026-11-15', // In den nächsten 7 Tagen
-    dateFormatted: 'So., 15.11.',
-    time: '15:30',
-    competition: '2. Bundesliga',
-    flag: '🇩🇪',
-    isGerman: true,
-    homeTeam: '1. FC Heidenheim',
-    awayTeam: 'Hannover 96',
-    tvChannels: [
-      { name: 'Sky Sport Bundesliga', hd: false, konferenz: true },
-      { name: 'Sky Sport Bundesliga 1 HD', hd: true, konferenz: true }
-    ],
-    streams: [
-      { name: 'Sky Go' },
-      { name: 'WOW' }
-    ]
   }
 ];
 
@@ -102,14 +99,18 @@ export default function App() {
   const [onlyGerman, setOnlyGerman] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Exakte tagesaktuelle Filterung ohne alte Spiele
   const filteredMatches = useMemo(() => {
-    // Simuliertes / Echtes heutiges Datum: 2026-11-10
     const todayStr = '2026-11-10';
     const tomorrowStr = '2026-11-11';
     const in7DaysStr = '2026-11-17';
 
     return MATCHES_DATA.filter((match) => {
+      // Frauen-Spiele explizit herausfiltern (sollte ohnehin keine geben, zur Sicherheit)
+      const isWomenMatch = match.competition.toLowerCase().includes('frauen') || 
+                           match.homeTeam.toLowerCase().includes('frauen') || 
+                           match.awayTeam.toLowerCase().includes('frauen');
+      if (isWomenMatch) return false;
+
       if (onlyGerman && !match.isGerman) return false;
       
       if (activeTab === 'heute') {
@@ -117,7 +118,6 @@ export default function App() {
       } else if (activeTab === 'morgen') {
         if (match.date !== tomorrowStr) return false;
       } else if (activeTab === 'naechste') {
-        // Streng die nächsten 7 Tage (exklusive heute bis in 7 Tagen)
         if (match.date <= todayStr || match.date > in7DaysStr) return false;
       }
 
@@ -185,7 +185,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Sehr übersichtliche Matrix-Tabelle */}
+      {/* Matrix-Tabelle */}
       <main className="max-w-6xl mx-auto px-3 mt-3">
         {filteredMatches.length === 0 ? (
           <div className="bg-[#1e2229] border border-slate-700 rounded-lg p-10 text-center text-slate-400 text-xs">
@@ -238,24 +238,28 @@ export default function App() {
                     {/* TV / HD-TV Angebote (untereinander) */}
                     <td className="py-3.5 px-3.5">
                       <div className="flex flex-col gap-1.5">
-                        {match.tvChannels.map((c, i) => (
-                          <div 
-                            key={i} 
-                            className={`font-black text-[11px] px-3 py-1.5 rounded shadow-sm inline-flex items-center justify-between gap-2 w-full max-w-xs ${
-                              c.hd ? 'bg-slate-200 text-slate-900 border border-slate-300' : 'bg-[#facc15] text-slate-950'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              {c.hd && <span className="text-[9px] bg-slate-900 text-white px-1 py-0.5 rounded shrink-0 font-bold">HD</span>}
-                              <span className="truncate">{c.name}</span>
+                        {match.tvChannels.length === 0 ? (
+                          <span className="text-slate-500 italic">Keine TV-Daten</span>
+                        ) : (
+                          match.tvChannels.map((c, i) => (
+                            <div 
+                              key={i} 
+                              className={`font-black text-[11px] px-3 py-1.5 rounded shadow-sm inline-flex items-center justify-between gap-2 w-full max-w-xs ${
+                                c.hd ? 'bg-slate-200 text-slate-900 border border-slate-300' : 'bg-[#facc15] text-slate-950'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2 truncate">
+                                {c.hd && <span className="text-[9px] bg-slate-900 text-white px-1 py-0.5 rounded shrink-0 font-bold">HD</span>}
+                                <span className="truncate">{c.name}</span>
+                              </div>
+                              {c.konferenz && (
+                                <span className="bg-slate-950 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0" title="Konferenz verfügbar">
+                                  K
+                                </span>
+                              )}
                             </div>
-                            {c.konferenz && (
-                              <span className="bg-slate-950 text-white w-4 h-4 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0" title="Konferenz verfügbar">
-                                K
-                              </span>
-                            )}
-                          </div>
-                        ))}
+                          ))
+                        )}
                       </div>
                     </td>
 
