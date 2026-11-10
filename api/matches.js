@@ -33,27 +33,13 @@ export default async function handler(req, res) {
     const $ = cheerio.load(html);
     const matches = [];
 
-    // Relevanten deutschen Teams / Ligen im Frauenbereich für die Freigabe
-    const germanKeywords = [
-      'deutschland', 'bayern', 'wolfsburg', 'frankfurt', 'hoffenheim', 
-      'leverkusen', 'freiburg', 'essen', 'werder', 'leipzig', 'köln', 
-      'jena', 'potsdam', 'bundesliga'
-    ];
-
     $('tr').each((index, element) => {
       const rowText = $(element).text();
       const lower = rowText.toLowerCase();
 
-      const isWomenMatch = lower.includes('frauen') || lower.includes('women') || lower.includes('wom');
-
-      if (isWomenMatch) {
-        // Prüfen, ob eine deutsche Beteiligung vorhanden ist
-        const hasGermanInvolvement = germanKeywords.some(keyword => lower.includes(keyword));
-        
-        // Wenn Frauen-Spiel ohne deutsche Beteiligung oder Juniorinnen -> Überspringen
-        if (!hasGermanInvolvement || lower.includes('juniorinnen') || lower.includes('u17') || lower.includes('u19')) {
-          return;
-        }
+      // Sofortiger, kompromissloser Ausschluss bei Treffern nach Frauen oder Women
+      if (lower.includes('frauen') || lower.includes('women')) {
+        return;
       }
 
       // Uhrzeit & Datum extrahieren
