@@ -8,6 +8,7 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Live-Daten abhängig vom ausgewählten Tab aus der Vercel-API laden
   useEffect(() => {
     async function fetchScrapedMatches() {
       setLoading(true);
@@ -22,7 +23,7 @@ export default function App() {
           setMatches([]);
         }
       } catch (error) {
-        console.error('Fehler beim Abrufen:', error);
+        console.error('Fehler beim Abrufen vom Scraper:', error);
         setMatches([]);
       } finally {
         setLoading(false);
@@ -32,17 +33,15 @@ export default function App() {
     fetchScrapedMatches();
   }, [activeTab]);
 
+  // Keine hartcodierten Restriktionen – alle gelieferten Spiele werden angezeigt
   const filteredMatches = useMemo(() => {
     return matches.filter((match) => {
-      const text = (match.homeTeam + ' ' + match.awayTeam + ' ' + match.competition).toLowerCase();
-      if (text.includes('frauen') || text.includes('women') || text.includes('wom')) return false;
-
       if (onlyGerman && !match.isGerman) return false;
 
       if (searchQuery.trim() !== '') {
         const q = searchQuery.toLowerCase();
-        const matchTeam = match.homeTeam.toLowerCase().includes(q) || match.awayTeam.toLowerCase().includes(q);
-        const matchComp = match.competition.toLowerCase().includes(q);
+        const matchTeam = (match.homeTeam || '').toLowerCase().includes(q) || (match.awayTeam || '').toLowerCase().includes(q);
+        const matchComp = (match.competition || '').toLowerCase().includes(q);
         if (!matchTeam && !matchComp) return false;
       }
       return true;
@@ -55,6 +54,7 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#1e2229] border-b border-slate-700 shadow-md">
         <div className="max-w-7xl mx-auto px-3 py-3 flex items-center justify-between gap-2 overflow-x-auto">
+          
           <div className="bg-gradient-to-r from-orange-600 to-amber-500 text-white font-black px-3 py-1.5 rounded uppercase tracking-tighter text-sm italic shadow flex items-center shrink-0">
             FUSSBALL<span className="text-cyan-300 ml-0.5">GUCKEN</span>
           </div>
@@ -118,9 +118,9 @@ export default function App() {
             <table className="w-full text-left border-collapse min-w-[850px]">
               <thead>
                 <tr className="bg-[#262b35] border-b border-slate-700 text-[11px] font-extrabold uppercase text-amber-400 tracking-wider">
-                  <th className="py-3 px-3 w-24">Datum</th>
+                  <th className="py-3 px-3 w-28">Datum</th>
                   <th className="py-3 px-3 w-24">Uhrzeit</th>
-                  <th className="py-3 px-3 w-40">Liga / Pokal</th>
+                  <th className="py-3 px-3 w-44">Liga / Pokal</th>
                   <th className="py-3 px-3 w-56">Mannschaften</th>
                   <th className="py-3 px-3">TV & HD-TV</th>
                   <th className="py-3 px-3 w-52">Internet (Livestreams)</th>
@@ -130,25 +130,25 @@ export default function App() {
                 {filteredMatches.map((match) => (
                   <tr key={match.id} className="hover:bg-slate-800/40 transition align-top">
                     
-                    {/* Datum (Neue Spalte ganz links) */}
+                    {/* 1. Spalte: Datum */}
                     <td className="py-3.5 px-3 whitespace-nowrap bg-[#171a20] font-semibold text-slate-300">
                       {match.date || 'Heute'}
                     </td>
 
-                    {/* Uhrzeit */}
+                    {/* 2. Spalte: Uhrzeit */}
                     <td className="py-3.5 px-3 whitespace-nowrap bg-[#171a20] font-bold text-amber-400">
                       {match.time} Uhr
                     </td>
 
-                    {/* Liga */}
+                    {/* 3. Spalte: Liga */}
                     <td className="py-3.5 px-3 font-medium text-slate-300">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm">{match.flag}</span>
+                        <span className="text-sm">{match.flag || '⚽'}</span>
                         <span className="font-semibold truncate">{match.competition}</span>
                       </div>
                     </td>
 
-                    {/* Mannschaften */}
+                    {/* 4. Spalte: Mannschaften */}
                     <td className="py-3.5 px-3 font-bold text-white">
                       <div className="flex flex-col space-y-1 my-1">
                         <div className="text-slate-100">{match.homeTeam}</div>
@@ -157,35 +157,48 @@ export default function App() {
                       </div>
                     </td>
 
-                    {/* TV & HD-TV getrennt & übersichtlich */}
+                    {/* 5. Spalte: TV & HD-TV */}
                     <td className="py-3.5 px-3">
                       <div className="flex flex-col space-y-1.5 my-1">
-                        {match.tvChannels?.map((c, i) => (
-                          <div key={`tv-${i}`} className="bg-amber-400 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded shadow-sm inline-flex items-center justify-between max-w-[200px]">
-                            <span className="truncate">{c.name}</span>
-                            {c.free && <span className="text-[9px] bg-red-600 text-white px-1 rounded ml-1 font-bold">FREE</span>}
-                          </div>
-                        ))}
-                        {match.hdChannels?.map((c, i) => (
-                          <div key={`hd-${i}`} className="bg-slate-200 text-slate-900 border border-slate-300 font-black text-[11px] px-2.5 py-1 rounded shadow-sm inline-flex items-center justify-between max-w-[200px]">
-                            <div className="flex items-center gap-1.5 overflow-hidden">
-                              <span className="text-[9px] bg-slate-900 text-white px-1 rounded shrink-0">HD</span>
+                        {match.tvChannels && match.tvChannels.length > 0 ? (
+                          match.tvChannels.map((c, i) => (
+                            <div key={`tv-${i}`} className="bg-amber-400 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded shadow-sm inline-flex items-center justify-between max-w-[200px]">
                               <span className="truncate">{c.name}</span>
+                              {c.free && <span className="text-[9px] bg-red-600 text-white px-1 rounded ml-1 font-bold">FREE</span>}
                             </div>
-                            {c.free && <span className="text-[9px] bg-red-600 text-white px-1 rounded ml-1 font-bold">FREE</span>}
-                          </div>
-                        ))}
+                          ))
+                        ) : null}
+
+                        {match.hdChannels && match.hdChannels.length > 0 ? (
+                          match.hdChannels.map((c, i) => (
+                            <div key={`hd-${i}`} className="bg-slate-200 text-slate-900 border border-slate-300 font-black text-[11px] px-2.5 py-1 rounded shadow-sm inline-flex items-center justify-between max-w-[200px]">
+                              <div className="flex items-center gap-1.5 overflow-hidden">
+                                <span className="text-[9px] bg-slate-900 text-white px-1 rounded shrink-0">HD</span>
+                                <span className="truncate">{c.name}</span>
+                              </div>
+                              {c.free && <span className="text-[9px] bg-red-600 text-white px-1 rounded ml-1 font-bold">FREE</span>}
+                            </div>
+                          ))
+                        ) : null}
+
+                        {(!match.tvChannels?.length && !match.hdChannels?.length) && (
+                          <span className="text-slate-500 italic text-[11px]">-</span>
+                        )}
                       </div>
                     </td>
 
-                    {/* Internet Livestreams */}
+                    {/* 6. Spalte: Live Streams */}
                     <td className="py-3.5 px-3">
                       <div className="flex flex-col space-y-1.5 my-1">
-                        {match.streams?.map((s, i) => (
-                          <div key={i} className="bg-sky-500 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded shadow-sm max-w-[180px] truncate">
-                            {s.name}
-                          </div>
-                        ))}
+                        {match.streams && match.streams.length > 0 ? (
+                          match.streams.map((s, i) => (
+                            <div key={i} className="bg-sky-500 text-slate-950 font-black text-[11px] px-2.5 py-1 rounded shadow-sm max-w-[180px] truncate">
+                              {s.name}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-slate-500 italic text-[11px]">-</span>
+                        )}
                       </div>
                     </td>
 
